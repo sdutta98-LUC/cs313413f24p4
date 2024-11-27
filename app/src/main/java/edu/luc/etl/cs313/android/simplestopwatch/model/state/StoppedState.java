@@ -10,21 +10,33 @@ class StoppedState implements StopwatchState {
 
     private final StopwatchSMStateView sm;
 
-    @Override
-    public void onStartStop() {
-        sm.actionStart();
-        sm.toRunningState();
-    }
+    private int tickCount = 0;
 
     @Override
-    public void onLapReset() {
-        sm.actionReset();
-        sm.toStoppedState();
+    public void onStartStop() {
+        if(sm.getTime() == 99) {
+            //BEEP
+            sm.toRunningState();
+        }
+        else if(sm.getTime() == 0) {
+            sm.actionInc();
+            sm.clockStart();
+            tickCount = 0;
+        }
+        else {
+            sm.actionInc();
+            tickCount = 0;
+        }
     }
 
     @Override
     public void onTick() {
-        throw new UnsupportedOperationException("onTick");
+        if (tickCount == 3 && sm.getTime() != 0) {
+            sm.startAlarm();
+            sm.toRunningState();
+        } else {
+            tickCount++;
+        }
     }
 
     @Override

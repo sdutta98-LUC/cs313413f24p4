@@ -14,6 +14,12 @@ import edu.luc.etl.cs313.android.simplestopwatch.common.StopwatchModelListener;
 import edu.luc.etl.cs313.android.simplestopwatch.model.ConcreteStopwatchModelFacade;
 import edu.luc.etl.cs313.android.simplestopwatch.model.StopwatchModelFacade;
 
+import android.content.Context;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import java.io.IOException;
 /**
  * A thin adapter component for the stopwatch.
  *
@@ -56,7 +62,32 @@ public class StopwatchAdapter extends Activity implements StopwatchModelListener
     }
 
     // TODO remaining lifecycle methods
+    public void playDefaultNotification() {
+        final Uri defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        final MediaPlayer mediaPlayer = new MediaPlayer();
+        final Context context = getApplicationContext();
 
+        try {
+            mediaPlayer.setDataSource(context, defaultRingtoneUri);
+            mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+            mediaPlayer.prepare();
+            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    mp.release();
+                }
+            });
+            mediaPlayer.start();
+        } catch (final IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public void playAlarm() {
+
+        playDefaultNotification();
+
+    }
     /**
      * Updates the seconds and minutes in the UI.
      * @param time
@@ -65,10 +96,8 @@ public class StopwatchAdapter extends Activity implements StopwatchModelListener
         // UI adapter responsibility to schedule incoming events on UI thread
         runOnUiThread(() -> {
             final TextView tvS = findViewById(R.id.seconds);
-            final TextView tvM = findViewById(R.id.minutes);
             final var locale = Locale.getDefault();
             tvS.setText(String.format(locale,"%02d", time % Constants.SEC_PER_MIN));
-            tvM.setText(String.format(locale,"%02d", time / Constants.SEC_PER_MIN));
         });
     }
 
@@ -87,9 +116,5 @@ public class StopwatchAdapter extends Activity implements StopwatchModelListener
     // forward event listener methods to the model
     public void onStartStop(final View view) {
         model.onStartStop();
-    }
-
-    public void onLapReset(final View view)  {
-        model.onLapReset();
     }
 }
