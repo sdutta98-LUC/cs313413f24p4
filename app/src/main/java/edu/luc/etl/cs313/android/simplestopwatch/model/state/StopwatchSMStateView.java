@@ -12,12 +12,14 @@ interface StopwatchSMStateView {
     void toRunningState();
     void toStoppedState();
     void toAlarmedState();
+    void toIncrementingState();
 
     // actions
     void actionInit();
     void actionReset();
     void clockStart();
     void clockStop();
+    void clockReset();
     //void actionLap();
     void actionInc();
     void actionDec();

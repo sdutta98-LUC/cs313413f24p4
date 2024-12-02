@@ -1,5 +1,7 @@
 package edu.luc.etl.cs313.android.simplestopwatch.model.time;
 
+import android.util.Log;
+
 import static edu.luc.etl.cs313.android.simplestopwatch.common.Constants.*;
 
 /**
