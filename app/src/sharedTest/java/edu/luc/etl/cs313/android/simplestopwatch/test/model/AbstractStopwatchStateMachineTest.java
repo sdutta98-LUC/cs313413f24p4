@@ -72,52 +72,30 @@ public abstract class AbstractStopwatchStateMachineTest {
      * expect time 5.
      */
     @Test
-    public void testScenarioRun() {
+    public void testScenarioIncrementing() {
         assertTimeEquals(0);
         assertFalse(dependency.isStarted());
         // directly invoke the button press event handler methods
         model.onStartStop();
+        assertTimeEquals(1);
         assertTrue(dependency.isStarted());
         onTickRepeat(5);
-        assertTimeEquals(5);
+        assertTimeEquals(6);
     }
 
-    /**
-     * Verifies the following scenario: time is 0, press start, wait 5+ seconds,
-     * expect time 5, press lap, wait 4 seconds, expect time 5, press start,
-     * expect time 5, press lap, expect time 9, press lap, expect time 0.
-     *
-     * @throws Throwable
-     */
     @Test
-    public void testScenarioRunLapReset() {
+    public void testScenarioRunning() throws InterruptedException {
         assertTimeEquals(0);
         assertFalse(dependency.isStarted());
         // directly invoke the button press event handler methods
         model.onStartStop();
+        assertEquals(R.string.Incrementing, dependency.getState());
+        assertTrue(dependency.isStarted());
+        onTickRepeat(10);
+        assertTimeEquals(11);
+        model.toRunningState();
         assertEquals(R.string.RUNNING, dependency.getState());
-        assertTrue(dependency.isStarted());
-        onTickRepeat(5);
-        assertTimeEquals(5);
-        model.onLapReset();
-        assertEquals(R.string.LAP_RUNNING, dependency.getState());
-        assertTrue(dependency.isStarted());
-        onTickRepeat(4);
-        assertTimeEquals(5);
-        model.onStartStop();
-        assertEquals(R.string.LAP_STOPPED, dependency.getState());
-        assertFalse(dependency.isStarted());
-        assertTimeEquals(5);
-        model.onLapReset();
-        assertEquals(R.string.STOPPED, dependency.getState());
-        assertFalse(dependency.isStarted());
-        assertTimeEquals(9);
-        model.onLapReset();
-        assertEquals(R.string.STOPPED, dependency.getState());
-        assertFalse(dependency.isStarted());
-        assertTimeEquals(0);
     }
-
     /**
      * Sends the given number of tick events to the model.
      *
@@ -125,7 +103,7 @@ public abstract class AbstractStopwatchStateMachineTest {
      */
     protected void onTickRepeat(final int n) {
         for (var i = 0; i < n; i++)
-            model.onTick();
+            model.onStartStop();
     }
 
     /**
@@ -175,6 +153,11 @@ class UnifiedMockDependency implements TimeModel, ClockModel, StopwatchModelList
     }
 
     @Override
+    public void playAlarm() {
+
+    }
+
+    @Override
     public void setTickListener(TickListener listener) {
         throw new UnsupportedOperationException();
     }
@@ -200,8 +183,17 @@ class UnifiedMockDependency implements TimeModel, ClockModel, StopwatchModelList
     }
 
     @Override
+    public void decRuntime() {
+        runningTime--;
+    }
+
+    @Override
     public int getRuntime() {
         return runningTime;
     }
 
+    @Override
+    public void reset() {
+
+    }
 }
