@@ -1,0 +1,639 @@
+Code with javadoc but only the code that was added and not provided:
+
+StopWatchModelListener (Only 1 contribution so not including whole thing):
+
+/**
+* Plays the alarm sound
+*/
+void playAlarm();
+
+DefaultClockModel:
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * Class: DefaultClockModel
+ * This class implements the internal clock for the stopwatch
+ * It triggers tick events at regular intervals
+ */
+public class DefaultClockModel implements ClockModel {
+
+    // TODO make accurate by keeping track of partial seconds when canceled etc.
+
+    /**
+     * Timer used to schedule tick events
+     */
+    private Timer timer;
+
+    /**
+     * Listener that receives tick events
+     */
+    private TickListener listener;
+
+    /**
+     * Sets the tick listener
+     *
+     * @param listener the listener to set
+     */
+    @Override
+    public void setTickListener(final TickListener listener) {
+        this.listener = listener;
+    }
+
+    /**
+     * Starts the clock and schedules tick events
+     */
+    @Override
+    public void start() {
+        timer = new Timer();
+
+        // The clock model runs onTick every 1000 milliseconds
+        timer.schedule(new TimerTask() {
+            @Override public void run() {
+                // fire event
+                listener.onTick();
+            }
+        }, /*initial delay*/ 1000, /*periodic delay*/ 1000);
+    }
+
+    /**
+     * Stops the clock
+     */
+    @Override
+    public void stop() {
+        timer.cancel();
+    }
+
+    /**
+     * Resets the clock and starts it again
+     */
+    @Override
+    public void reset() {
+        if (timer != null) {
+            timer.cancel();
+        }
+        start();
+    }
+}
+
+
+
+AlarmedState:
+
+import edu.luc.etl.cs313.android.simplestopwatch.R;
+
+/**
+ * Class: AlarmedState
+ * This class is for the alarmed state of the stopwatch
+ * It handles what happens when the stopwatch is alarming
+ */
+class AlarmedState implements StopwatchState {
+
+    /**
+     * The state machine interface used by this state
+     */
+    private final StopwatchSMStateView sm;
+
+    /**
+     * Constructor for AlarmedState
+     * Sets up the state machine reference
+     *
+     * @param sm the state machine interface
+     */
+    public AlarmedState(final StopwatchSMStateView sm) {
+        this.sm = sm;
+    }
+
+    /**
+     * Handles the Start/Stop button press in the alarming state
+     * Stops the clock and transitions to the stopped state
+     */
+    @Override
+    public void onStartStop() {
+        sm.clockStop();
+        sm.toStoppedState();
+    }
+
+    /**
+     * Handles the tick event in the alarming state
+     * Starts the alarm sound
+     */
+    @Override
+    public void onTick() {
+        sm.startAlarm();
+    }
+
+    /**
+     * Updates the runtime display in the user interface
+     */
+    @Override
+    public void updateView() {
+        sm.updateUIRuntime();
+    }
+
+    /**
+     * Gets the ID for the alarming state
+     *
+     * @return the resource ID for the alarming state
+     */
+    @Override
+    public int getId() {
+        return R.string.ALARMING;
+    }
+}
+
+
+
+DefaultStopwatchStateMachine:
+
+import edu.luc.etl.cs313.android.simplestopwatch.common.StopwatchModelListener;
+import edu.luc.etl.cs313.android.simplestopwatch.model.clock.ClockModel;
+import edu.luc.etl.cs313.android.simplestopwatch.model.time.TimeModel;
+
+/**
+ * Class: DefaultStopwatchStateMachine
+ * This class is the state machine for the stopwatch
+ * It manages the different states and transitions of the stopwatch
+ */
+public class DefaultStopwatchStateMachine implements StopwatchStateMachine {
+
+    /**
+     * Constructor for DefaultStopwatchStateMachine
+     * It sets up the time model and clock model
+     *
+     * @param timeModel the time model to use
+     * @param clockModel the clock model to use
+     */
+    public DefaultStopwatchStateMachine(final TimeModel timeModel, final ClockModel clockModel) {
+        this.timeModel = timeModel;
+        this.clockModel = clockModel;
+    }
+
+    /**
+     * The time model used by the state machine
+     */
+    private final TimeModel timeModel;
+
+    /**
+     * The clock model used by the state machine
+     */
+    private final ClockModel clockModel;
+
+    /**
+     * The current state of the state machine
+     */
+    private StopwatchState state;
+
+    /**
+     * Sets the current state and updates the listener
+     *
+     * @param state the new state
+     */
+    protected void setState(final StopwatchState state) {
+        this.state = state;
+        listener.onStateUpdate(state.getId());
+    }
+
+    /**
+     * The listener for model updates
+     */
+    private StopwatchModelListener listener;
+
+    /**
+     * Sets the model listener
+     *
+     * @param listener the listener to set
+     */
+    @Override
+    public void setModelListener(final StopwatchModelListener listener) {
+        this.listener = listener;
+    }
+
+    // Forward event methods to the current state
+    // These methods are synchronized to handle events from different threads
+
+    @Override
+    public synchronized void onStartStop() { state.onStartStop(); }
+
+    @Override
+    public synchronized void onTick() { state.onTick(); }
+
+    /**
+     * Updates the UI runtime through the listener
+     */
+    @Override
+    public void updateUIRuntime() { listener.onTimeUpdate(timeModel.getRuntime()); }
+
+    /**
+     * Starts the alarm through the listener
+     */
+    @Override
+    public void startAlarm() { listener.playAlarm(); }
+
+    // Known states
+
+    private final StopwatchState STOPPED     = new StoppedState(this);
+    private final StopwatchState RUNNING     = new RunningState(this);
+    private final StopwatchState ALARMED     = new AlarmedState(this);
+    private final StopwatchState INCREMENTING = new IncrementingState(this);
+
+    // Transitions to different states
+
+    @Override
+    public void toRunningState() { setState(RUNNING); }
+
+    @Override
+    public void toStoppedState() { setState(STOPPED); }
+
+    @Override
+    public void toAlarmedState() { setState(ALARMED); }
+
+    @Override
+    public void toIncrementingState() { setState(INCREMENTING); }
+
+    // Actions
+
+    @Override
+    public void actionInit() { toStoppedState(); actionReset(); }
+
+    @Override
+    public void actionReset() { timeModel.resetRuntime(); actionUpdateView(); }
+
+    @Override
+    public void clockStart() { clockModel.start(); }
+
+    @Override
+    public void clockStop() { clockModel.stop(); }
+
+    @Override
+    public void clockReset() {
+        clockModel.reset();
+    }
+
+    @Override
+    public void actionInc() { timeModel.incRuntime(); actionUpdateView(); }
+
+    @Override
+    public void actionDec() { timeModel.decRuntime(); actionUpdateView(); }
+
+    @Override
+    public void actionUpdateView() { state.updateView(); }
+
+    /**
+     * Gets the current time from the time model
+     *
+     * @return the current time
+     */
+    @Override
+    public int getTime() {
+        return timeModel.getRuntime();
+    }
+}
+
+IncrementingState:
+
+import edu.luc.etl.cs313.android.simplestopwatch.R;
+
+/**
+ * Class: IncrementingState
+ * This class is for the incrementing state of the stopwatch
+ * It handles what happens when the stopwatch is adding time
+ */
+public class IncrementingState implements StopwatchState {
+
+    /**
+     * The state machine interface used by this state
+     */
+    private final StopwatchSMStateView sm;
+
+    /**
+     * Counter for ticks in this state
+     */
+    private int tickCount = 0;
+
+    /**
+     * Constructor for IncrementingState
+     * Sets up the state machine reference
+     *
+     * @param sm the state machine interface
+     */
+    public IncrementingState(final StopwatchSMStateView sm) {
+        this.sm = sm;
+    }
+
+    /**
+     * Updates the runtime display in the user interface
+     */
+    @Override
+    public void updateView() {
+        sm.updateUIRuntime();
+    }
+
+    /**
+     * Gets the ID for the incrementing state
+     *
+     * @return the resource ID for the incrementing state
+     */
+    @Override
+    public int getId() {
+        return R.string.Incrementing;
+    }
+
+    /**
+     * Handles the Start/Stop button press in the incrementing state
+     * Increments the time, resets the clock, and checks if time reaches 99
+     */
+    @Override
+    public void onStartStop() {
+        sm.actionInc();
+        sm.clockReset();
+        tickCount = 0;
+        if (sm.getTime() == 99) {
+            // BEEP
+            sm.startAlarm();
+            sm.toRunningState();
+        }
+    }
+
+    /**
+     * Handles the tick event in the incrementing state
+     * After 3 ticks, it starts the alarm and transitions to running state
+     */
+    @Override
+    public void onTick() {
+        if (tickCount == 3 && sm.getTime() != 0) {
+            sm.startAlarm();
+            sm.toRunningState();
+            tickCount = 0;
+        } else {
+            tickCount++;
+        }
+    }
+}
+
+RunningState:
+
+import edu.luc.etl.cs313.android.simplestopwatch.R;
+
+/**
+ * Class: RunningState
+ * This class is for the running state of the stopwatch
+ * It handles what happens when the stopwatch is running
+ */
+class RunningState implements StopwatchState {
+
+    /**
+     * The state machine interface used by this state
+     */
+    private final StopwatchSMStateView sm;
+
+    /**
+     * Constructor for RunningState
+     * Sets up the state machine reference
+     *
+     * @param sm the state machine interface
+     */
+    public RunningState(final StopwatchSMStateView sm) {
+        this.sm = sm;
+    }
+
+    /**
+     * Handles the Start/Stop button press in the running state
+     * Stops the clock, resets the time, and goes to the stopped state
+     */
+    @Override
+    public void onStartStop() {
+        sm.clockStop();
+        sm.actionReset();
+        sm.toStoppedState();
+    }
+
+    /**
+     * Handles the tick event in the running state
+     * Decreases the time, and if time reaches zero, starts alarm and goes to alarmed state
+     */
+    @Override
+    public void onTick() {
+        sm.actionDec();
+        if(sm.getTime() == 0) {
+            sm.startAlarm();
+            sm.toAlarmedState();
+        }
+    }
+
+    /**
+     * Updates the runtime display in the user interface
+     */
+    @Override
+    public void updateView() {
+        sm.updateUIRuntime();
+    }
+
+    /**
+     * Gets the ID for the running state
+     *
+     * @return the resource ID for the running state
+     */
+    @Override
+    public int getId() {
+        return R.string.RUNNING;
+    }
+}
+
+StoppedState:
+
+import android.util.Log;
+import edu.luc.etl.cs313.android.simplestopwatch.R;
+
+/**
+ * Class: StoppedState
+ * This class is for the stopped state of the stopwatch
+ * It handles what happens when the stopwatch is stopped
+ */
+class StoppedState implements StopwatchState {
+
+    /**
+     * The state machine interface used by this state
+     */
+    private final StopwatchSMStateView sm;
+
+    /**
+     * Constructor for StoppedState
+     * Sets up the state machine reference
+     *
+     * @param sm the state machine interface
+     */
+    public StoppedState(final StopwatchSMStateView sm) {
+        this.sm = sm;
+    }
+
+    /**
+     * Handles the Start/Stop button press in the stopped state
+     * Transitions to incrementing state, increments time, and starts the clock
+     */
+    @Override
+    public void onStartStop() {
+        sm.toIncrementingState();
+        sm.actionInc();
+        sm.clockStart();
+    }
+
+    /**
+     * Handles the tick event in the stopped state
+     * Currently outputs a debug message
+     */
+    @Override
+    public void onTick() {
+        System.out.println(111);
+    }
+
+    /**
+     * Updates the runtime display in the user interface
+     */
+    @Override
+    public void updateView() {
+        sm.updateUIRuntime();
+    }
+
+    /**
+     * Gets the ID for the stopped state
+     *
+     * @return the resource ID for the stopped state
+     */
+    @Override
+    public int getId() {
+        Return “Stopped”;
+    }
+}
+
+StopwatchSMStateView:
+
+/**
+ * The restricted view states have of their surrounding state machine
+ * This is a client-specific interface in Peter Coad's terminology
+ *
+ * @author laufer
+ */
+interface StopwatchSMStateView {
+
+    // transitions
+
+    /**
+     * Transitions to the running state
+     */
+    void toRunningState();
+
+    /**
+     * Transitions to the stopped state
+     */
+    void toStoppedState();
+
+    /**
+     * Transitions to the alarmed state
+     */
+    void toAlarmedState();
+
+    /**
+     * Transitions to the incrementing state
+     */
+    void toIncrementingState();
+
+    // actions
+
+    /**
+     * Initializes the stopwatch state machine
+     */
+    void actionInit();
+
+    /**
+     * Resets the stopwatch time to zero
+     */
+    void actionReset();
+
+    /**
+     * Starts the clock
+     */
+    void clockStart();
+
+    /**
+     * Stops the clock
+     */
+    void clockStop();
+
+    /**
+     * Resets the clock
+     */
+    void clockReset();
+
+    //void actionLap();
+
+    /**
+     * Increments the stopwatch time
+     */
+    void actionInc();
+
+    /**
+     * Decrements the stopwatch time
+     */
+    void actionDec();
+
+    /**
+     * Updates the view based on the current state
+     */
+    void actionUpdateView();
+
+    // state-dependent UI updates
+
+    /**
+     * Updates the runtime display in the user interface
+     */
+    void updateUIRuntime();
+
+    /**
+     * Starts the alarm sound
+     */
+    void startAlarm();
+
+    // get time from timer
+
+    /**
+     * Gets the current time from the timer
+     *
+     * @return the current time
+     */
+    int getTime();
+}
+
+StopwatchState:
+
+import edu.luc.etl.cs313.android.simplestopwatch.common.StopwatchUIListener;
+import edu.luc.etl.cs313.android.simplestopwatch.model.clock.TickListener;
+
+/**
+* A state in a state machine. This interface is part of the State pattern.
+*
+* @author laufer
+*/
+
+interface StopwatchState extends StopwatchUIListener, TickListener {
+
+    /**
+     * Updates the view based on the current state
+     */
+    void updateView();
+
+    /**
+     * Gets the ID for the current state
+     *
+     * @return the resource ID for the current state
+     */
+    int getId();
+}
+
+
+
+
+
+
+
