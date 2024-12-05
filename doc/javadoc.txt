@@ -1,4 +1,4 @@
-Code with javadoc but only the code that was added and not provided:
+Code with javadoc added but only the code that was added and not provided:
 
 StopWatchModelListener (Only 1 contribution so not including whole thing):
 
